@@ -6,12 +6,38 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <errno.h>
+
+
+void process_exit(int sign){
+
+    while(1){
+        pid_t pid = waitpid(-1, NULL, WNOHANG);
+        //当此时的pid = 0 时，表示没有进程结束
+        //pid = -1时，表示出现了错误 储存在errno中
+        //pid = 结束进程的id
+        if(pid <=0){
+            // 
+            break;
+        }
+        printf("child process:%d die\n", pid);
+        exit(0);
+    }
+
+
+}
+
+    
+
+
+
+
 int childWork(int cfd){
     char buff[1024];
     memset(buff, 0, sizeof(buff));
     int len = read(cfd, buff, sizeof(buff));
     if(len > 0){
         printf("client says:%s\n",buff);
+        write(cfd, buff, sizeof(buff));
     }
     else if(len == 0){
         printf("client disconnected\n");
@@ -36,7 +62,7 @@ int main(){
 
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_port = htons(10000);
+    addr.sin_port = htons(4444);
 
     //允许重用本地地址和端口
     int flag = 1;
@@ -54,6 +80,14 @@ int main(){
         perror("listen");
         return -1;
     }
+
+    //检测子进程结束的信号量
+    struct sigaction act;
+    act.sa_flags = 0;
+    act.sa_handler = process_exit;
+    sigemptyset(&act.sa_mask);
+    sigaction(SIGCHLD, &act, NULL);
+
 
     while(1){
 
