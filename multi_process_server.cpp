@@ -6,12 +6,29 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <errno.h>
+
+
+void callback(int num)
+{
+    while(1)
+    {
+        pid_t pid = waitpid(-1, NULL, WNOHANG);
+        if(pid <= 0)
+        {
+            printf("子进程正在运行, 或者子进程被回收完毕了\n");
+            break;
+        }
+        printf("child die, pid = %d\n", pid);
+    }
+}
+
 int childWork(int cfd){
     char buff[1024];
     memset(buff, 0, sizeof(buff));
     int len = read(cfd, buff, sizeof(buff));
     if(len > 0){
         printf("client says:%s\n",buff);
+        write(cfd, buff, sizeof(buff));
     }
     else if(len == 0){
         printf("client disconnected\n");
@@ -36,7 +53,7 @@ int main(){
 
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_port = htons(10000);
+    addr.sin_port = htons(5555);
 
     //允许重用本地地址和端口
     int flag = 1;
@@ -55,6 +72,19 @@ int main(){
         return -1;
     }
 
+    struct sigaction act;
+    act.sa_flags = 0;
+    act.sa_handler = callback;
+    sigemptyset(&act.sa_mask);
+    sigaction(SIGCHLD, &act, NULL);
+
+
+
+
+
+
+
+
     while(1){
 
         struct sockaddr_in childaddr;
@@ -65,10 +95,10 @@ int main(){
                 continue;
             }
             perror("accept");
-            break;
+            exit(0);
         }
 
-        char ip[24];
+        char ip[24] = {0};
         printf("client's id:%s, port:%d\n",inet_ntop(AF_INET, &childaddr.sin_addr.s_addr, ip,sizeof(ip)), ntohs(childaddr.sin_port));
 
         pid_t pid = fork();
@@ -80,14 +110,11 @@ int main(){
                     break;
                 }
             }
-
+            close(cfd);
+            exit(0);
         }
         else if(pid > 0){
             close(cfd);
-        }
-        else if(pid < 0){
-            perror("childporcess");
-            break;
         }
 
 
